@@ -1,30 +1,53 @@
 // src/services/analyticsService.js
-const FALLBACK_API_BASE = "https://itl-411-finals-backend.onrender.com/api";
+const RAW_API_BASE =
+  import.meta.env.VITE_API_BASE_URL ||
+  "https://itl-411-finals-backend.onrender.com/api";
 
-const API_BASE = (import.meta.env.VITE_API_BASE_URL || FALLBACK_API_BASE)
-  .replace(/\/+$/, ""); 
+// Normalize: remove trailing slashes, e.g. "....../api/"
+const API_BASE = RAW_API_BASE.replace(/\/+$/, "");
+
+// 2) Helper to build URLs with query params
 function buildUrl(path, params = {}) {
   if (!API_BASE) throw new Error("VITE_API_BASE_URL is not set");
-  const url = new URL(`${API_BASE}/${String(path).replace(/^\/+/, "")}`);
+
+  // remove leading slashes from path so we don’t get double “//”
+  const cleanPath = String(path).replace(/^\/+/, "");
+  const url = new URL(`${API_BASE}/${cleanPath}`);
+
   Object.entries(params).forEach(([k, v]) => {
-    if (v !== undefined && v !== null && v !== "") url.searchParams.set(k, v);
+    if (v !== undefined && v !== null && v !== "") {
+      url.searchParams.set(k, v);
+    }
   });
+
   return url;
 }
 
+// 3) Generic GET helper
 async function apiGet(path, params = {}) {
   const url = buildUrl(path, params);
 
-  console.log("Calling API:", url.toString()); // temporary debug
+  // You can open DevTools → Console to see this in the browser
+  console.log("Calling API:", url.toString());
 
   const res = await fetch(url.toString(), {
-    headers: { Accept: "application/json" },
+    method: "GET",
+    headers: {
+      Accept: "application/json",
+    },
+    // IMPORTANT: no credentials here, so we don’t need CORS-with-credentials
   });
 
   const text = await res.text();
-  if (!res.ok) throw new Error(`HTTP ${res.status}: ${text || res.statusText}`);
+
+  if (!res.ok) {
+    throw new Error(`HTTP ${res.status}: ${text || res.statusText}`);
+  }
+
   return text ? JSON.parse(text) : null;
 }
+
+/* ---------- API functions (unchanged signatures) ---------- */
 
 /** Weather summary (current + daily) */
 export function fetchWeatherSummary({ city = "Bacolod,PH" } = {}) {
@@ -51,6 +74,8 @@ export function fetchFeatureImportance() {
   return apiGet("analytics/feature-importance");
 }
 
+/** Combined weather + analytics endpoint */
 export function fetchWeatherAnalytics({ city = "Bacolod,PH" } = {}) {
-  return apiGet("analytics/", { city });  // Note: "analytics/" not "analytics/analytics"
+  // Note: "analytics/" → backend path is /api/analytics/
+  return apiGet("analytics/", { city });
 }
