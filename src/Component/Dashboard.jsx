@@ -1,6 +1,14 @@
 // src/Component/Dashboard.jsx
-import React, { useEffect, useMemo, useState } from "react";
-import { fetchWeatherSummary, fetchWeatherAnalytics } from "../services/analyticsService";
+import React, {
+  useEffect,
+  useMemo,
+  useState,
+  useRef,
+} from "react";
+import {
+  fetchWeatherSummary,
+  fetchWeatherAnalytics,
+} from "../services/analyticsService";
 
 /* ---------- Formatting helpers ---------- */
 
@@ -49,16 +57,16 @@ const iconFor = (pop, rainMm) => {
 /* ---------- Weather Advisory Helper ---------- */
 const getDailyOutfitAdvisory = (dayData, index) => {
   if (!dayData) return { items: [], advisoryLevel: "normal", color: "emerald" };
-  
+
   const tempMax = dayData.temp_max || 25;
   const tempMin = dayData.temp_min || 20;
   const pop = dayData.pop || 0;
   const rainMm = dayData.rain_mm || 0;
-  
+
   const items = [];
   let advisoryLevel = "normal";
   let color = "emerald";
-  
+
   // Temperature-based recommendations
   if (tempMax >= 32) {
     advisoryLevel = "hot";
@@ -85,7 +93,7 @@ const getDailyOutfitAdvisory = (dayData, index) => {
     color = "emerald";
     items.push({ icon: "👕", item: "T-shirt", category: "clothing" });
   }
-  
+
   // Rain-based items
   if (pop >= 80 || rainMm >= 5) {
     advisoryLevel = "rainy";
@@ -94,24 +102,24 @@ const getDailyOutfitAdvisory = (dayData, index) => {
     items.push({ icon: "👢", item: "Rain boots", category: "footwear" });
     items.push({ icon: "🧥", item: "Raincoat", category: "clothing" });
   } else if (pop >= 50 || rainMm >= 2) {
-    if (!items.some(item => item.item === "Umbrella")) {
+    if (!items.some((item) => item.item === "Umbrella")) {
       items.push({ icon: "🌂", item: "Umbrella", category: "essential" });
     }
-    if (!items.some(item => item.item === "Jacket")) {
+    if (!items.some((item) => item.item === "Jacket")) {
       items.push({ icon: "🧥", item: "Light jacket", category: "clothing" });
     }
   }
-  
+
   // Always recommend essentials for hot days
-  if (tempMax >= 25 && !items.some(item => item.item === "Water")) {
+  if (tempMax >= 25 && !items.some((item) => item.item === "Water")) {
     items.push({ icon: "💧", item: "Water", category: "essential" });
   }
-  
+
   return {
-    items: items.slice(0, 4), // Limit to 4 items per day
+    items: items.slice(0, 4),
     advisoryLevel,
     color,
-    dayName: index === 0 ? "Today" : fmt.shortDay(dayData.date)
+    dayName: index === 0 ? "Today" : fmt.shortDay(dayData.date),
   };
 };
 
@@ -249,11 +257,11 @@ const PH_LOCATIONS = [
 /* ---------- Dashboard component ---------- */
 
 export default function Dashboard() {
-  // this string is sent to Django / OWM
+  // backend query string
   const [cityQuery, setCityQuery] = useState(
     "Bacolod City, Negros Occidental, Philippines"
   );
-  // this label is shown on the selector button
+  // label shown in selector
   const [locationLabel, setLocationLabel] = useState(
     "Bacolod City • Negros Occidental • Visayas"
   );
@@ -263,14 +271,31 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState("");
 
+  // mobile nav state
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
+
+  // section refs for smooth scroll
+  const heroRef = useRef(null);
+  const forecastRef = useRef(null);
+  const analyticsRef = useRef(null);
+  const chartRef = useRef(null);
+
+  const scrollToSection = (ref) => {
+    if (ref && ref.current) {
+      ref.current.scrollIntoView({
+        behavior: "smooth",
+        block: "start",
+      });
+    }
+  };
+
   async function load() {
     setLoading(true);
     setErr("");
     try {
-      // Fetch both weather summary AND analytics
       const [weatherData, analyticsData] = await Promise.all([
         fetchWeatherSummary({ city: cityQuery }),
-        fetchWeatherAnalytics({ city: cityQuery })
+        fetchWeatherAnalytics({ city: cityQuery }),
       ]);
       setWx(weatherData);
       setAnalytics(analyticsData);
@@ -283,7 +308,7 @@ export default function Dashboard() {
 
   useEffect(() => {
     load();
-    // eslint-disable-next-line
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cityQuery]);
 
   const temps = useMemo(
@@ -296,23 +321,44 @@ export default function Dashboard() {
   );
   const labels = useMemo(() => (wx?.daily || []).map((d) => d.date), [wx]);
 
-  // Get daily outfit advisories
-  const dailyOutfitAdvisories = useMemo(() => 
-    (wx?.daily || []).slice(0, 5).map((day, index) => ({
-      ...day,
-      outfitAdvisory: getDailyOutfitAdvisory(day, index)
-    })),
+  // outfit advisories
+  const dailyOutfitAdvisories = useMemo(
+    () =>
+      (wx?.daily || [])
+        .slice(0, 5)
+        .map((day, index) => ({
+          ...day,
+          outfitAdvisory: getDailyOutfitAdvisory(day, index),
+        })),
     [wx]
   );
 
   const handleLocationChange = (loc) => {
-    setCityQuery(loc.query);      // for backend
-    setLocationLabel(loc.display); // for UI label
+    setCityQuery(loc.query);
+    setLocationLabel(loc.display);
+  };
+
+  // nav click handlers (desktop + mobile)
+  const handleDashboardClick = () => {
+    scrollToSection(heroRef);
+    setMobileNavOpen(false);
+  };
+  const handleForecastClick = () => {
+    scrollToSection(forecastRef);
+    setMobileNavOpen(false);
+  };
+  const handleAnalyticsClick = () => {
+    scrollToSection(analyticsRef);
+    setMobileNavOpen(false);
+  };
+  const handleChartClick = () => {
+    scrollToSection(chartRef);
+    setMobileNavOpen(false);
   };
 
   return (
-    <div className="min-h-screen w-screen bg-slate-950 text-slate-100 flex overflow-hidden">
-      {/* SIDEBAR – full height, fixed width */}
+    <div className="min-h-screen bg-slate-950 text-slate-100 flex overflow-hidden">
+      {/* DESKTOP SIDEBAR */}
       <aside className="hidden md:flex w-64 lg:w-72 flex-col border-r border-slate-800 bg-slate-950/95 px-6 py-6">
         <div className="flex items-center gap-3 mb-8">
           <div className="flex h-9 w-9 items-center justify-center rounded-2xl bg-violet-500/90 shadow-lg shadow-violet-500/40">
@@ -325,9 +371,16 @@ export default function Dashboard() {
         </div>
 
         <nav className="space-y-1 text-sm">
-          <NavItem active>Dashboard</NavItem>
-          <NavItem>Forecast</NavItem>
-          <NavItem>Settings</NavItem>
+          <NavItem active onClick={handleDashboardClick}>
+            Dashboard
+          </NavItem>
+          <NavItem onClick={handleForecastClick}>Forecast</NavItem>
+          <NavItem onClick={handleAnalyticsClick}>
+            Linear Regression Analytics
+          </NavItem>
+          <NavItem onClick={handleChartClick}>
+            Temperature trend &amp; rain probability
+          </NavItem>
         </nav>
 
         <div className="mt-auto pt-8 text-xs text-slate-500">
@@ -344,20 +397,95 @@ export default function Dashboard() {
         </div>
       </aside>
 
+      {/* MOBILE NAV OVERLAY */}
+      {mobileNavOpen && (
+        <div
+          className="fixed inset-0 z-40 bg-black/60 md:hidden"
+          onClick={() => setMobileNavOpen(false)}
+        >
+          <div
+            className="absolute left-0 top-0 h-full w-64 bg-slate-950 border-r border-slate-800 px-5 py-6 flex flex-col"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between mb-6">
+              <div className="flex items-center gap-3">
+                <div className="flex h-8 w-8 items-center justify-center rounded-2xl bg-violet-500/90 shadow-lg shadow-violet-500/40">
+                  <span className="text-lg">⚡</span>
+                </div>
+                <div>
+                  <p className="text-sm font-semibold">SkySense</p>
+                  <p className="text-[11px] text-slate-500">
+                    Weather Suite
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setMobileNavOpen(false)}
+                className="text-slate-400 hover:text-slate-100 text-xl"
+              >
+                ×
+              </button>
+            </div>
+
+            <nav className="space-y-1 text-sm">
+              <NavItem active onClick={handleDashboardClick}>
+                Dashboard
+              </NavItem>
+              <NavItem onClick={handleForecastClick}>Forecast</NavItem>
+              <NavItem onClick={handleAnalyticsClick}>
+                Linear Regression Analytics
+              </NavItem>
+              <NavItem onClick={handleChartClick}>
+                Temperature trend &amp; rain probability
+              </NavItem>
+            </nav>
+
+            <div className="mt-auto pt-6 text-[11px] text-slate-500">
+              <p className="font-medium text-slate-400">Today</p>
+              {wx ? (
+                <>
+                  <p>{fmt.dateNice(wx.current?.dt)}</p>
+                  <p className="mt-1 text-slate-400">{wx.city ?? "—"}</p>
+                </>
+              ) : (
+                <p>Loading…</p>
+              )}
+              <p className="mt-4 text-slate-600">v1.0</p>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* MAIN COLUMN */}
       <div className="flex-1 flex flex-col">
-        {/* TOP BAR – sticks to top, full width */}
-        <header className="sticky top-0 z-20 flex items-center justify-between border-b border-slate-800 bg-slate-950/95 px-4 py-3 md:px-8 backdrop-blur">
-          <div>
-            <h1 className="text-xl md:text-2xl font-semibold">
-              Weather &amp; Forecast Dashboard
-            </h1>
-            <p className="text-xs md:text-sm text-slate-400 mt-1">
-              Live conditions, next-day outlook, and predictive analytics.
-            </p>
+        {/* TOP BAR */}
+        <header className="sticky top-0 z-30 flex items-center justify-between gap-3 border-b border-slate-800 bg-slate-950/95 px-4 py-3 md:px-8 backdrop-blur">
+          <div className="flex items-center gap-3">
+            {/* mobile burger */}
+            <button
+              type="button"
+              className="md:hidden inline-flex h-9 w-9 items-center justify-center rounded-xl border border-slate-700 bg-slate-900 text-slate-100"
+              onClick={() => setMobileNavOpen(true)}
+            >
+              <span className="sr-only">Open navigation</span>
+              <span className="flex flex-col gap-[3px]">
+                <span className="block h-[2px] w-4 bg-slate-100 rounded" />
+                <span className="block h-[2px] w-4 bg-slate-100 rounded" />
+                <span className="block h-[2px] w-4 bg-slate-100 rounded" />
+              </span>
+            </button>
+            <div>
+              <h1 className="text-lg md:text-2xl font-semibold">
+                Weather &amp; Forecast Dashboard
+              </h1>
+              <p className="text-[11px] md:text-xs text-slate-400 mt-1">
+                Live conditions, next-day outlook, and predictive analytics.
+              </p>
+            </div>
           </div>
 
-          {/* Smart PH location selector */}
+          {/* Location selector */}
           <LocationSelector
             locations={PH_LOCATIONS}
             selectedLabel={locationLabel}
@@ -365,7 +493,7 @@ export default function Dashboard() {
           />
         </header>
 
-        {/* SCROLLABLE CONTENT */}
+        {/* CONTENT */}
         <main className="flex-1 overflow-y-auto px-4 py-5 md:px-8 md:py-8">
           {err && (
             <div className="mb-4 rounded-2xl border border-red-400/30 bg-red-900/20 px-4 py-3 text-sm text-red-200">
@@ -377,48 +505,54 @@ export default function Dashboard() {
             <Skeleton />
           ) : wx ? (
             <div className="space-y-6">
-              {/* TOP ROW: HERO + HIGHLIGHTS */}
-              <div className="grid gap-6 xl:grid-cols-[minmax(0,2.2fr)_minmax(0,1.4fr)]">
+              {/* HERO + HIGHLIGHTS */}
+              <div
+                ref={heroRef}
+                className="grid gap-6 xl:grid-cols-[minmax(0,2.2fr)_minmax(0,1.4fr)]"
+              >
                 {/* HERO CARD */}
-                <section className="rounded-3xl bg-gradient-to-br from-slate-900 to-slate-950 ring-1 ring-white/5 p-6 md:p-7 shadow-xl shadow-black/40">
+                <section className="rounded-3xl bg-gradient-to-br from-slate-900 to-slate-950 ring-1 ring-white/5 p-5 md:p-7 shadow-xl shadow-black/40">
                   <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-6">
                     <div>
-                      <div className="inline-flex items-center gap-2 rounded-full bg-slate-900/80 px-3 py-1 text-xs text-slate-300 ring-1 ring-white/10">
+                      <div className="inline-flex items-center gap-2 rounded-full bg-slate-900/80 px-3 py-1 text-[11px] text-slate-300 ring-1 ring-white/10">
                         <span className="inline-flex h-2 w-2 rounded-full bg-emerald-400" />
                         <span>{wx.city ?? "—"}</span>
                       </div>
 
-                      <div className="mt-4 text-3xl md:text-4xl font-bold">
+                      <div className="mt-4 text-2xl md:text-3xl font-bold">
                         {fmt.dateNice(wx.current?.dt)}
                       </div>
 
-                      <div className="mt-6 flex items-end gap-4">
+                      <div className="mt-4 md:mt-6 flex items-end gap-4">
                         <div>
-                          <div className="text-5xl md:text-6xl font-extrabold leading-none">
+                          <div className="text-4xl md:text-5xl lg:text-6xl font-extrabold leading-none">
                             {fmt.temp(wx.current?.temp_c)}
                           </div>
-                          <div className="mt-2 text-slate-300">
+                          <div className="mt-2 text-slate-300 text-xs md:text-sm">
                             High: {fmt.temp(wx.daily?.[0]?.temp_max)} • Low:{" "}
                             {fmt.temp(wx.daily?.[0]?.temp_min)}
                           </div>
                         </div>
-                        <div className="hidden sm:block text-6xl md:text-7xl select-none">
-                          {iconFor(wx.daily?.[0]?.pop, wx.daily?.[0]?.rain_mm)}
+                        <div className="hidden sm:block text-5xl md:text-6xl lg:text-7xl select-none">
+                          {iconFor(
+                            wx.daily?.[0]?.pop,
+                            wx.daily?.[0]?.rain_mm
+                          )}
                         </div>
                       </div>
 
-                      <div className="mt-4 text-lg md:text-xl">
+                      <div className="mt-4 text-base md:text-lg">
                         {(wx.current?.description || "").replace(
                           /\b\w/g,
                           (c) => c.toUpperCase()
                         )}
                       </div>
-                      <div className="text-sm text-slate-400 mt-1">
+                      <div className="text-xs md:text-sm text-slate-400 mt-1">
                         Feels like {fmt.temp(wx.current?.feels_like)}
                       </div>
                     </div>
 
-                    {/* QUICK METRICS PILL COLUMN */}
+                    {/* QUICK METRICS */}
                     <div className="grid grid-cols-2 gap-3 md:w-64">
                       <MiniMetric
                         label="Sunrise"
@@ -452,56 +586,59 @@ export default function Dashboard() {
                   </div>
                 </section>
 
-                {/* HIGHLIGHTS GRID */}
+                {/* HIGHLIGHTS */}
                 <section className="grid gap-4 sm:grid-cols-2">
                   <Highlight title="Chance of Rain">
-                    <div className="text-3xl font-extrabold">
+                    <div className="text-2xl md:text-3xl font-extrabold">
                       {fmt.pct(wx.daily?.[0]?.pop)}{" "}
-                      <span className="text-sm text-slate-400 align-middle">
+                      <span className="text-xs md:text-sm text-slate-400 align-middle">
                         ({fmt.mm(wx.daily?.[0]?.rain_mm)})
                       </span>
                     </div>
-                    <p className="mt-1 text-xs text-slate-400">
+                    <p className="mt-1 text-[11px] md:text-xs text-slate-400">
                       Based on today&apos;s forecast.
                     </p>
                   </Highlight>
 
                   <Highlight title="UV Index">
-                    <div className="text-3xl font-extrabold">
+                    <div className="text-2xl md:text-3xl font-extrabold">
                       {wx.current?.uvi ?? "—"}
                     </div>
-                    <p className="mt-1 text-xs text-slate-400">
+                    <p className="mt-1 text-[11px] md:text-xs text-slate-400">
                       Higher value means stronger sun intensity.
                     </p>
                   </Highlight>
 
                   <Highlight title="Wind Status">
-                    <div className="text-3xl font-extrabold">
+                    <div className="text-2xl md:text-3xl font-extrabold">
                       {wx.current?.wind_speed != null
                         ? `${wx.current.wind_speed} m/s`
                         : "—"}
                     </div>
-                    <p className="mt-1 text-xs text-slate-400">
+                    <p className="mt-1 text-[11px] md:text-xs text-slate-400">
                       Measured at ground level.
                     </p>
                   </Highlight>
 
                   <Highlight title="Humidity">
-                    <div className="text-3xl font-extrabold">
+                    <div className="text-2xl md:text-3xl font-extrabold">
                       {wx.current?.humidity != null
                         ? `${wx.current.humidity}%`
-                            : "—"}
+                        : "—"}
                     </div>
-                    <p className="mt-1 text-xs text-slate-400">
+                    <p className="mt-1 text-[11px] md:text-xs text-slate-400">
                       Relative moisture in the air.
                     </p>
                   </Highlight>
                 </section>
               </div>
 
-              {/* SECOND ROW: 5-DAY + COORDS CARD */}
-              <div className="grid gap-6 lg:grid-cols-[minmax(0,2fr)_minmax(0,1.1fr)]">
-                <section className="rounded-3xl bg-slate-900/80 ring-1 ring-white/5 p-5 shadow-lg shadow-black/40">
+              {/* FORECAST + LOCATION DETAILS */}
+              <div
+                ref={forecastRef}
+                className="grid gap-6 lg:grid-cols-[minmax(0,2fr)_minmax(0,1.1fr)]"
+              >
+                <section className="rounded-3xl bg-slate-900/80 ring-1 ring-white/5 p-4 md:p-5 shadow-lg shadow-black/40">
                   <div className="mb-4 flex items-center justify-between">
                     <div>
                       <div className="text-sm text-slate-300">
@@ -538,7 +675,7 @@ export default function Dashboard() {
                   </div>
                 </section>
 
-                <section className="rounded-3xl bg-slate-900/80 ring-1 ring-white/5 p-5 flex flex-col justify-between shadow-lg shadow-black/40">
+                <section className="rounded-3xl bg-slate-900/80 ring-1 ring-white/5 p-4 md:p-5 flex flex-col justify-between shadow-lg shadow-black/40">
                   <div>
                     <div className="text-sm text-slate-300">
                       Location details
@@ -570,9 +707,11 @@ export default function Dashboard() {
                 </section>
               </div>
 
-              {/* DAILY OUTFIT ADVISORY - HORIZONTAL LAYOUT */}
-              <section className="rounded-3xl bg-gradient-to-br from-amber-900/20 to-orange-900/30 ring-1 ring-white/5 p-5 shadow-lg shadow-black/40">
-                <div className="mb-5 flex items-center justify-between">
+              {/* DAILY OUTFIT ADVISORY */}
+              <section
+                className="rounded-3xl bg-gradient-to-br from-amber-900/20 to-orange-900/30 ring-1 ring-white/5 p-4 md:p-5 shadow-lg shadow-black/40"
+              >
+                <div className="mb-5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                   <div>
                     <div className="text-sm text-slate-300">
                       👕 Daily Outfit Advisory
@@ -581,7 +720,7 @@ export default function Dashboard() {
                       What to wear in these days - Plan your outfits
                     </div>
                   </div>
-                  <div className="text-xs px-3 py-1 rounded-full bg-amber-500/20 text-amber-300">
+                  <div className="self-start sm:self-auto text-xs px-3 py-1 rounded-full bg-amber-500/20 text-amber-300">
                     Smart Recommendations
                   </div>
                 </div>
@@ -591,11 +730,15 @@ export default function Dashboard() {
                     <div
                       key={index}
                       className={`rounded-2xl border border-white/10 p-4 shadow-sm shadow-black/40 ${
-                        day.outfitAdvisory.color === 'red' ? 'bg-red-900/20' :
-                        day.outfitAdvisory.color === 'orange' ? 'bg-orange-900/20' :
-                        day.outfitAdvisory.color === 'blue' ? 'bg-blue-900/20' :
-                        day.outfitAdvisory.color === 'indigo' ? 'bg-indigo-900/20' :
-                        'bg-emerald-900/20'
+                        day.outfitAdvisory.color === "red"
+                          ? "bg-red-900/20"
+                          : day.outfitAdvisory.color === "orange"
+                          ? "bg-orange-900/20"
+                          : day.outfitAdvisory.color === "blue"
+                          ? "bg-blue-900/20"
+                          : day.outfitAdvisory.color === "indigo"
+                          ? "bg-indigo-900/20"
+                          : "bg-emerald-900/20"
                       }`}
                     >
                       <div className="flex items-center justify-between mb-3">
@@ -604,7 +747,8 @@ export default function Dashboard() {
                             {day.outfitAdvisory.dayName}
                           </div>
                           <div className="text-xs text-slate-400">
-                            {fmt.temp(day.temp_max)} / {fmt.temp(day.temp_min)}
+                            {fmt.temp(day.temp_max)} /{" "}
+                            {fmt.temp(day.temp_min)}
                           </div>
                         </div>
                         <div className="text-2xl">
@@ -613,24 +757,37 @@ export default function Dashboard() {
                       </div>
 
                       <div className="mb-3">
-                        <div className={`text-xs px-2 py-1 rounded-full inline-block ${
-                          day.outfitAdvisory.color === 'red' ? 'bg-red-500/20 text-red-300' :
-                          day.outfitAdvisory.color === 'orange' ? 'bg-orange-500/20 text-orange-300' :
-                          day.outfitAdvisory.color === 'blue' ? 'bg-blue-500/20 text-blue-300' :
-                          day.outfitAdvisory.color === 'indigo' ? 'bg-indigo-500/20 text-indigo-300' :
-                          'bg-emerald-500/20 text-emerald-300'
-                        }`}>
+                        <div
+                          className={`text-xs px-2 py-1 rounded-full inline-block ${
+                            day.outfitAdvisory.color === "red"
+                              ? "bg-red-500/20 text-red-300"
+                              : day.outfitAdvisory.color === "orange"
+                              ? "bg-orange-500/20 text-orange-300"
+                              : day.outfitAdvisory.color === "blue"
+                              ? "bg-blue-500/20 text-blue-300"
+                              : day.outfitAdvisory.color === "indigo"
+                              ? "bg-indigo-500/20 text-indigo-300"
+                              : "bg-emerald-500/20 text-emerald-300"
+                          }`}
+                        >
                           {day.outfitAdvisory.advisoryLevel.toUpperCase()}
                         </div>
                       </div>
 
                       <div className="space-y-2">
-                        <div className="text-xs text-slate-400">Recommended items:</div>
+                        <div className="text-xs text-slate-400">
+                          Recommended items:
+                        </div>
                         <div className="space-y-1">
                           {day.outfitAdvisory.items.map((item, idx) => (
-                            <div key={idx} className="flex items-center gap-2 text-xs">
+                            <div
+                              key={idx}
+                              className="flex items-center gap-2 text-xs"
+                            >
                               <span className="text-base">{item.icon}</span>
-                              <span className="text-slate-200">{item.item}</span>
+                              <span className="text-slate-200">
+                                {item.item}
+                              </span>
                             </div>
                           ))}
                         </div>
@@ -639,7 +796,9 @@ export default function Dashboard() {
                       {day.pop >= 50 && (
                         <div className="mt-3 text-xs text-blue-300 flex items-center gap-1">
                           <span>☔</span>
-                          <span>Bring umbrella ({fmt.pct(day.pop)})</span>
+                          <span>
+                            Bring umbrella ({fmt.pct(day.pop)})
+                          </span>
                         </div>
                       )}
                       {day.temp_max >= 30 && (
@@ -653,32 +812,45 @@ export default function Dashboard() {
                 </div>
 
                 <div className="mt-5 pt-4 border-t border-white/10">
-                  <div className="text-xs text-slate-400 mb-2">💡 Pro tips:</div>
+                  <div className="text-xs text-slate-400 mb-2">
+                    💡 Pro tips:
+                  </div>
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-xs">
                     <div className="flex items-center gap-1">
                       <span>🔥 Hot days:</span>
-                      <span className="text-slate-300">Light clothes, sunscreen</span>
+                      <span className="text-slate-300">
+                        Light clothes, sunscreen
+                      </span>
                     </div>
                     <div className="flex items-center gap-1">
                       <span>🌧️ Rainy:</span>
-                      <span className="text-slate-300">Umbrella, waterproof</span>
+                      <span className="text-slate-300">
+                        Umbrella, waterproof
+                      </span>
                     </div>
                     <div className="flex items-center gap-1">
                       <span>❄️ Cool:</span>
-                      <span className="text-slate-300">Layer up, jacket</span>
+                      <span className="text-slate-300">
+                        Layer up, jacket
+                      </span>
                     </div>
                     <div className="flex items-center gap-1">
                       <span>☀️ Sunny:</span>
-                      <span className="text-slate-300">Hat, sunglasses</span>
+                      <span className="text-slate-300">
+                        Hat, sunglasses
+                      </span>
                     </div>
                   </div>
                 </div>
               </section>
 
-              {/* LINEAR REGRESSION ANALYTICS SECTION */}
+              {/* LINEAR REGRESSION ANALYTICS */}
               {analytics && (
-                <section className="rounded-3xl bg-gradient-to-br from-purple-900/30 to-indigo-900/30 ring-1 ring-white/5 p-5 shadow-lg shadow-black/40">
-                  <div className="mb-4 flex items-center justify-between">
+                <section
+                  ref={analyticsRef}
+                  className="rounded-3xl bg-gradient-to-br from-purple-900/30 to-indigo-900/30 ring-1 ring-white/5 p-4 md:p-5 shadow-lg shadow-black/40"
+                >
+                  <div className="mb-4 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
                     <div>
                       <div className="text-sm text-slate-300">
                         📈 Linear Regression Analytics
@@ -689,7 +861,8 @@ export default function Dashboard() {
                     </div>
                     <div className="flex items-center gap-2">
                       <span className="text-xs px-2 py-1 rounded-full bg-purple-500/20 text-purple-300">
-                        Confidence: {analytics.analytics_confidence?.temperature || 0}%
+                        Confidence:{" "}
+                        {analytics.analytics_confidence?.temperature || 0}%
                       </span>
                     </div>
                   </div>
@@ -698,24 +871,37 @@ export default function Dashboard() {
                     {/* Temperature Predictions */}
                     <div className="rounded-2xl bg-slate-900/50 p-4 ring-1 ring-white/10">
                       <div className="flex items-center justify-between mb-3">
-                        <div className="text-xs text-slate-400">Temperature Trend</div>
-                        <div className={`text-xs px-2 py-1 rounded-full ${
-                          analytics.predictions?.temperature?.trend === 'increasing' 
-                            ? 'bg-red-500/20 text-red-300' 
-                            : analytics.predictions?.temperature?.trend === 'decreasing'
-                            ? 'bg-blue-500/20 text-blue-300'
-                            : 'bg-slate-500/20 text-slate-300'
-                        }`}>
+                        <div className="text-xs text-slate-400">
+                          Temperature Trend
+                        </div>
+                        <div
+                          className={`text-xs px-2 py-1 rounded-full ${
+                            analytics.predictions?.temperature?.trend ===
+                            "increasing"
+                              ? "bg-red-500/20 text-red-300"
+                              : analytics.predictions?.temperature?.trend ===
+                                "decreasing"
+                              ? "bg-blue-500/20 text-blue-300"
+                              : "bg-slate-500/20 text-slate-300"
+                          }`}
+                        >
                           {analytics.predictions?.temperature?.trend?.toUpperCase()}
                         </div>
                       </div>
                       <div className="text-2xl font-bold">
-                        {analytics.predictions?.temperature?.slope > 0 ? '+' : ''}
-                        {analytics.predictions?.temperature?.slope || 0}°C/day
+                        {analytics.predictions?.temperature?.slope > 0
+                          ? "+"
+                          : ""}
+                        {analytics.predictions?.temperature?.slope || 0}
+                        °C/day
                       </div>
-                      <div className="text-xs text-slate-400 mt-2">Next 7 days:</div>
-                      <div className="flex gap-2 mt-1">
-                        {(analytics.predictions?.temperature?.next_7_days || []).map((temp, idx) => (
+                      <div className="text-xs text-slate-400 mt-2">
+                        Next 7 days:
+                      </div>
+                      <div className="flex flex-wrap gap-2 mt-1">
+                        {(analytics.predictions?.temperature?.next_7_days ||
+                          []
+                        ).map((temp, idx) => (
                           <div key={idx} className="text-sm">
                             {Math.round(temp)}°
                           </div>
@@ -726,46 +912,67 @@ export default function Dashboard() {
                     {/* Rainfall Predictions */}
                     <div className="rounded-2xl bg-slate-900/50 p-4 ring-1 ring-white/10">
                       <div className="flex items-center justify-between mb-3">
-                        <div className="text-xs text-slate-400">Rainfall Analysis</div>
-                        <div className={`text-xs px-2 py-1 rounded-full ${
-                          analytics.predictions?.rainfall?.trend === 'increasing' 
-                            ? 'bg-blue-500/20 text-blue-300' 
-                            : analytics.predictions?.rainfall?.trend === 'decreasing'
-                            ? 'bg-blue-400/20 text-blue-300'
-                            : 'bg-slate-500/20 text-slate-300'
-                        }`}>
+                        <div className="text-xs text-slate-400">
+                          Rainfall Analysis
+                        </div>
+                        <div
+                          className={`text-xs px-2 py-1 rounded-full ${
+                            analytics.predictions?.rainfall?.trend ===
+                            "increasing"
+                              ? "bg-blue-500/20 text-blue-300"
+                              : analytics.predictions?.rainfall?.trend ===
+                                "decreasing"
+                              ? "bg-blue-400/20 text-blue-300"
+                              : "bg-slate-500/20 text-slate-300"
+                          }`}
+                        >
                           {analytics.predictions?.rainfall?.trend?.toUpperCase()}
                         </div>
                       </div>
                       <div className="text-2xl font-bold">
-                        Avg: {Math.round(analytics.historical_summary?.avg_rain_prob || 0)}%
+                        Avg:{" "}
+                        {Math.round(
+                          analytics.historical_summary?.avg_rain_prob || 0
+                        )}
+                        %
                       </div>
                       <div className="text-xs text-slate-400 mt-2">
-                        High risk days: {analytics.predictions?.rainfall?.high_risk_days?.length || 0}
+                        High risk days:{" "}
+                        {analytics.predictions?.rainfall?.high_risk_days
+                          ?.length || 0}
                       </div>
-                      <div className="flex gap-1 mt-2">
-                        {(analytics.predictions?.rainfall?.next_7_days || []).map((rain, idx) => (
-                          <div 
-                            key={idx} 
-                            className={`text-xs px-2 py-1 rounded ${
-                              rain > 70 ? 'bg-blue-500/30 text-blue-200' :
-                              rain > 40 ? 'bg-blue-500/20 text-blue-300' :
-                              'bg-slate-700/30 text-slate-400'
-                            }`}
-                          >
-                            {Math.round(rain)}%
-                          </div>
-                        ))}
+                      <div className="flex flex-wrap gap-1 mt-2">
+                        {(analytics.predictions?.rainfall?.next_7_days || []).map(
+                          (rain, idx) => (
+                            <div
+                              key={idx}
+                              className={`text-xs px-2 py-1 rounded ${
+                                rain > 70
+                                  ? "bg-blue-500/30 text-blue-200"
+                                  : rain > 40
+                                  ? "bg-blue-500/20 text-blue-300"
+                                  : "bg-slate-700/30 text-slate-400"
+                              }`}
+                            >
+                              {Math.round(rain)}%
+                            </div>
+                          )
+                        )}
                       </div>
                     </div>
                   </div>
 
                   {/* Insights */}
                   <div className="mt-4 pt-4 border-t border-white/10">
-                    <div className="text-xs text-slate-400 mb-2">AI Insights:</div>
+                    <div className="text-xs text-slate-400 mb-2">
+                      AI Insights:
+                    </div>
                     <div className="space-y-1">
                       {(analytics.insights || []).map((insight, idx) => (
-                        <div key={idx} className="text-sm text-slate-300 flex items-start gap-2">
+                        <div
+                          key={idx}
+                          className="text-sm text-slate-300 flex items-start gap-2"
+                        >
                           <span className="mt-1">•</span>
                           <span>{insight}</span>
                         </div>
@@ -773,17 +980,19 @@ export default function Dashboard() {
                     </div>
                   </div>
 
-                  {/* Model Info */}
                   <div className="mt-4 text-xs text-slate-500">
-                    Model: {analytics.regression_metrics?.model} • 
-                    Analyzed {analytics.historical_summary?.days_analyzed || 0} days • 
+                    Model: {analytics.regression_metrics?.model} • Analyzed{" "}
+                    {analytics.historical_summary?.days_analyzed || 0} days •
                     σ={analytics.historical_summary?.temperature_std || 0}°C
                   </div>
                 </section>
               )}
 
               {/* CHART ROW */}
-              <section className="rounded-3xl bg-slate-900/80 ring-1 ring-white/5 p-5 shadow-lg shadow-black/40">
+              <section
+                ref={chartRef}
+                className="rounded-3xl bg-slate-900/80 ring-1 ring-white/5 p-4 md:p-5 shadow-lg shadow-black/40"
+              >
                 <div className="mb-3 flex items-center justify-between">
                   <div>
                     <div className="text-sm text-slate-300">
@@ -851,14 +1060,14 @@ function LocationSelector({ locations, selectedLabel, onChange }) {
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
-        className="min-w-[260px] md:min-w-[320px] flex items-center justify-between rounded-2xl bg-slate-900/80 px-3 py-2 text-left text-slate-100 ring-1 ring-violet-500/60 focus:ring-2 focus:ring-violet-400 outline-none"
+        className="min-w-[220px] sm:min-w-[260px] md:min-w-[320px] flex items-center justify-between rounded-2xl bg-slate-900/80 px-3 py-2 text-left text-slate-100 ring-1 ring-violet-500/60 focus:ring-2 focus:ring-violet-400 outline-none"
       >
         <span className="truncate">{selectedLabel}</span>
         <span className="ml-2 text-violet-400">▾</span>
       </button>
 
       {open && (
-        <div className="absolute right-0 mt-2 w-[380px] md:w-[420px] rounded-2xl bg-slate-900/95 ring-1 ring-white/10 shadow-xl shadow-black/40 z-30">
+        <div className="absolute right-0 mt-2 w-[320px] sm:w-[380px] md:w-[420px] rounded-2xl bg-slate-900/95 ring-1 ring-white/10 shadow-xl shadow-black/40 z-30">
           <div className="p-3 border-b border-slate-800">
             <p className="text-[11px] uppercase tracking-wide text-slate-400 mb-2">
               Select location (Philippines)
@@ -931,9 +1140,11 @@ function LocationSelector({ locations, selectedLabel, onChange }) {
 
 /* ---------- Small UI pieces ---------- */
 
-function NavItem({ children, active }) {
+function NavItem({ children, active, onClick }) {
   return (
     <button
+      type="button"
+      onClick={onClick}
       className={`w-full text-left px-3 py-2 rounded-2xl text-sm transition ${
         active
           ? "bg-slate-800 text-slate-50 font-medium ring-1 ring-violet-500/60"
@@ -992,11 +1203,12 @@ function Skeleton() {
 
 /** Pure SVG chart: temp line + rain bars (all real API values). */
 function TempRainChart({ temps = [], rains = [], labels = [] }) {
-  const w = 1100,
-    h = 260,
-    pad = 36;
-  const innerW = w - pad * 2,
-    innerH = h - pad * 2;
+  const w = 1100;
+  const h = 260;
+  const pad = 36;
+  const innerW = w - pad * 2;
+  const innerH = h - pad * 2;
+
   if (!temps.length)
     return <div className="h-56 rounded-2xl bg-slate-800/40" />;
 
@@ -1032,6 +1244,7 @@ function TempRainChart({ temps = [], rains = [], labels = [] }) {
       <svg width={w} height={h} className="block">
         {/* grid */}
         {gridLines}
+
         {/* rain bars */}
         {rains.map((p, i) => {
           const bw = (innerW / rains.length) * 0.5;
@@ -1050,12 +1263,14 @@ function TempRainChart({ temps = [], rains = [], labels = [] }) {
             />
           );
         })}
+
         {/* temperature line */}
         <path
           d={line}
           className="stroke-red-400 fill-none"
           strokeWidth="2.5"
         />
+
         {/* temp points */}
         {temps.map((v, i) => (
           <circle
@@ -1066,6 +1281,7 @@ function TempRainChart({ temps = [], rains = [], labels = [] }) {
             className="fill-red-400"
           />
         ))}
+
         {/* x labels */}
         {labels.map((d, i) => (
           <text
@@ -1081,11 +1297,10 @@ function TempRainChart({ temps = [], rains = [], labels = [] }) {
             })}
           </text>
         ))}
+
         {/* y axis labels (°C on left) */}
         {Array.from({ length: ticksY + 1 }).map((_, i) => {
-          const val = Math.round(
-            tMax - (i / ticksY) * (tMax - tMin)
-          );
+          const val = Math.round(tMax - (i / ticksY) * (tMax - tMin));
           const yy = pad + (i / ticksY) * innerH + 3;
           return (
             <text
@@ -1098,6 +1313,7 @@ function TempRainChart({ temps = [], rains = [], labels = [] }) {
             </text>
           );
         })}
+
         <text
           x={w - 24}
           y={pad - 8}
