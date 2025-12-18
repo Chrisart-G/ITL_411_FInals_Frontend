@@ -42,3 +42,7 @@ export function fetchForecast({ city = "Bacolod,PH", horizon = 7 } = {}) {
 export function fetchFeatureImportance() {
   return apiGet("analytics/feature-importance");
 }
+
+export function fetchWeatherAnalytics({ city = "Bacolod,PH" } = {}) {
+  return apiGet("analytics/", { city });  // Note: "analytics/" not "analytics/analytics"
+}

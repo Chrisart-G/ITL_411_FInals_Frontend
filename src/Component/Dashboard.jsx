@@ -1,6 +1,6 @@
 // src/Component/Dashboard.jsx
 import React, { useEffect, useMemo, useState } from "react";
-import { fetchWeatherSummary } from "../services/analyticsService";
+import { fetchWeatherSummary, fetchWeatherAnalytics } from "../services/analyticsService";
 
 /* ---------- Formatting helpers ---------- */
 
@@ -32,12 +32,87 @@ const fmt = {
           year: "numeric",
         })
       : "—",
+  shortDay: (d) =>
+    d
+      ? new Date(d).toLocaleDateString(undefined, {
+          weekday: "short",
+        })
+      : "—",
 };
 
 const iconFor = (pop, rainMm) => {
   if ((rainMm ?? 0) > 0.1) return "🌧️";
   if ((pop ?? 0) >= 60) return "🌦️";
   return "☀️";
+};
+
+/* ---------- Weather Advisory Helper ---------- */
+const getDailyOutfitAdvisory = (dayData, index) => {
+  if (!dayData) return { items: [], advisoryLevel: "normal", color: "emerald" };
+  
+  const tempMax = dayData.temp_max || 25;
+  const tempMin = dayData.temp_min || 20;
+  const pop = dayData.pop || 0;
+  const rainMm = dayData.rain_mm || 0;
+  
+  const items = [];
+  let advisoryLevel = "normal";
+  let color = "emerald";
+  
+  // Temperature-based recommendations
+  if (tempMax >= 32) {
+    advisoryLevel = "hot";
+    color = "red";
+    items.push({ icon: "🕶️", item: "Sunglasses", category: "accessory" });
+    items.push({ icon: "🧴", item: "Sunscreen", category: "essential" });
+    items.push({ icon: "🧢", item: "Cap/Hat", category: "accessory" });
+    items.push({ icon: "👕", item: "Light shirt", category: "clothing" });
+    items.push({ icon: "💧", item: "Water bottle", category: "essential" });
+  } else if (tempMax >= 28) {
+    advisoryLevel = "warm";
+    color = "orange";
+    items.push({ icon: "🧴", item: "Sunscreen", category: "essential" });
+    items.push({ icon: "🧢", item: "Hat", category: "accessory" });
+    items.push({ icon: "👕", item: "T-shirt", category: "clothing" });
+    items.push({ icon: "💧", item: "Water", category: "essential" });
+  } else if (tempMax <= 22) {
+    advisoryLevel = "cool";
+    color = "blue";
+    items.push({ icon: "🧥", item: "Jacket", category: "clothing" });
+    items.push({ icon: "👖", item: "Pants", category: "clothing" });
+  } else {
+    advisoryLevel = "mild";
+    color = "emerald";
+    items.push({ icon: "👕", item: "T-shirt", category: "clothing" });
+  }
+  
+  // Rain-based items
+  if (pop >= 80 || rainMm >= 5) {
+    advisoryLevel = "rainy";
+    color = "indigo";
+    items.push({ icon: "☔", item: "Umbrella", category: "essential" });
+    items.push({ icon: "👢", item: "Rain boots", category: "footwear" });
+    items.push({ icon: "🧥", item: "Raincoat", category: "clothing" });
+  } else if (pop >= 50 || rainMm >= 2) {
+    if (!items.some(item => item.item === "Umbrella")) {
+      items.push({ icon: "🌂", item: "Umbrella", category: "essential" });
+    }
+    if (!items.some(item => item.item === "Jacket")) {
+      items.push({ icon: "🧥", item: "Light jacket", category: "clothing" });
+    }
+  }
+  
+  // Always recommend essentials for hot days
+  if (tempMax >= 25 && !items.some(item => item.item === "Water")) {
+    items.push({ icon: "💧", item: "Water", category: "essential" });
+  }
+  
+  return {
+    items: items.slice(0, 4), // Limit to 4 items per day
+    advisoryLevel,
+    color,
+    dayName: index === 0 ? "Today" : fmt.shortDay(dayData.date)
+  };
 };
 
 /* ---------- PH Locations (region → province → cities/municipalities) ---------- */
@@ -184,6 +259,7 @@ export default function Dashboard() {
   );
 
   const [wx, setWx] = useState(null);
+  const [analytics, setAnalytics] = useState(null);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState("");
 
@@ -191,8 +267,13 @@ export default function Dashboard() {
     setLoading(true);
     setErr("");
     try {
-      const data = await fetchWeatherSummary({ city: cityQuery });
-      setWx(data);
+      // Fetch both weather summary AND analytics
+      const [weatherData, analyticsData] = await Promise.all([
+        fetchWeatherSummary({ city: cityQuery }),
+        fetchWeatherAnalytics({ city: cityQuery })
+      ]);
+      setWx(weatherData);
+      setAnalytics(analyticsData);
     } catch (e) {
       setErr(e.message || "Failed to load weather");
     } finally {
@@ -214,6 +295,15 @@ export default function Dashboard() {
     [wx]
   );
   const labels = useMemo(() => (wx?.daily || []).map((d) => d.date), [wx]);
+
+  // Get daily outfit advisories
+  const dailyOutfitAdvisories = useMemo(() => 
+    (wx?.daily || []).slice(0, 5).map((day, index) => ({
+      ...day,
+      outfitAdvisory: getDailyOutfitAdvisory(day, index)
+    })),
+    [wx]
+  );
 
   const handleLocationChange = (loc) => {
     setCityQuery(loc.query);      // for backend
@@ -263,7 +353,7 @@ export default function Dashboard() {
               Weather &amp; Forecast Dashboard
             </h1>
             <p className="text-xs md:text-sm text-slate-400 mt-1">
-              Live conditions, next-day outlook, and 5-day trend.
+              Live conditions, next-day outlook, and predictive analytics.
             </p>
           </div>
 
@@ -400,7 +490,7 @@ export default function Dashboard() {
                     <div className="text-3xl font-extrabold">
                       {wx.current?.humidity != null
                         ? `${wx.current.humidity}%`
-                        : "—"}
+                            : "—"}
                     </div>
                     <p className="mt-1 text-xs text-slate-400">
                       Relative moisture in the air.
@@ -479,6 +569,218 @@ export default function Dashboard() {
                   </div>
                 </section>
               </div>
+
+              {/* DAILY OUTFIT ADVISORY - HORIZONTAL LAYOUT */}
+              <section className="rounded-3xl bg-gradient-to-br from-amber-900/20 to-orange-900/30 ring-1 ring-white/5 p-5 shadow-lg shadow-black/40">
+                <div className="mb-5 flex items-center justify-between">
+                  <div>
+                    <div className="text-sm text-slate-300">
+                      👕 Daily Outfit Advisory
+                    </div>
+                    <div className="text-xs text-slate-500">
+                      What to wear in these days - Plan your outfits
+                    </div>
+                  </div>
+                  <div className="text-xs px-3 py-1 rounded-full bg-amber-500/20 text-amber-300">
+                    Smart Recommendations
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
+                  {dailyOutfitAdvisories.map((day, index) => (
+                    <div
+                      key={index}
+                      className={`rounded-2xl border border-white/10 p-4 shadow-sm shadow-black/40 ${
+                        day.outfitAdvisory.color === 'red' ? 'bg-red-900/20' :
+                        day.outfitAdvisory.color === 'orange' ? 'bg-orange-900/20' :
+                        day.outfitAdvisory.color === 'blue' ? 'bg-blue-900/20' :
+                        day.outfitAdvisory.color === 'indigo' ? 'bg-indigo-900/20' :
+                        'bg-emerald-900/20'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between mb-3">
+                        <div>
+                          <div className="text-sm font-medium">
+                            {day.outfitAdvisory.dayName}
+                          </div>
+                          <div className="text-xs text-slate-400">
+                            {fmt.temp(day.temp_max)} / {fmt.temp(day.temp_min)}
+                          </div>
+                        </div>
+                        <div className="text-2xl">
+                          {iconFor(day.pop, day.rain_mm)}
+                        </div>
+                      </div>
+
+                      <div className="mb-3">
+                        <div className={`text-xs px-2 py-1 rounded-full inline-block ${
+                          day.outfitAdvisory.color === 'red' ? 'bg-red-500/20 text-red-300' :
+                          day.outfitAdvisory.color === 'orange' ? 'bg-orange-500/20 text-orange-300' :
+                          day.outfitAdvisory.color === 'blue' ? 'bg-blue-500/20 text-blue-300' :
+                          day.outfitAdvisory.color === 'indigo' ? 'bg-indigo-500/20 text-indigo-300' :
+                          'bg-emerald-500/20 text-emerald-300'
+                        }`}>
+                          {day.outfitAdvisory.advisoryLevel.toUpperCase()}
+                        </div>
+                      </div>
+
+                      <div className="space-y-2">
+                        <div className="text-xs text-slate-400">Recommended items:</div>
+                        <div className="space-y-1">
+                          {day.outfitAdvisory.items.map((item, idx) => (
+                            <div key={idx} className="flex items-center gap-2 text-xs">
+                              <span className="text-base">{item.icon}</span>
+                              <span className="text-slate-200">{item.item}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+
+                      {day.pop >= 50 && (
+                        <div className="mt-3 text-xs text-blue-300 flex items-center gap-1">
+                          <span>☔</span>
+                          <span>Bring umbrella ({fmt.pct(day.pop)})</span>
+                        </div>
+                      )}
+                      {day.temp_max >= 30 && (
+                        <div className="mt-2 text-xs text-red-300 flex items-center gap-1">
+                          <span>🧴</span>
+                          <span>Apply sunscreen</span>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+
+                <div className="mt-5 pt-4 border-t border-white/10">
+                  <div className="text-xs text-slate-400 mb-2">💡 Pro tips:</div>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-xs">
+                    <div className="flex items-center gap-1">
+                      <span>🔥 Hot days:</span>
+                      <span className="text-slate-300">Light clothes, sunscreen</span>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <span>🌧️ Rainy:</span>
+                      <span className="text-slate-300">Umbrella, waterproof</span>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <span>❄️ Cool:</span>
+                      <span className="text-slate-300">Layer up, jacket</span>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <span>☀️ Sunny:</span>
+                      <span className="text-slate-300">Hat, sunglasses</span>
+                    </div>
+                  </div>
+                </div>
+              </section>
+
+              {/* LINEAR REGRESSION ANALYTICS SECTION */}
+              {analytics && (
+                <section className="rounded-3xl bg-gradient-to-br from-purple-900/30 to-indigo-900/30 ring-1 ring-white/5 p-5 shadow-lg shadow-black/40">
+                  <div className="mb-4 flex items-center justify-between">
+                    <div>
+                      <div className="text-sm text-slate-300">
+                        📈 Linear Regression Analytics
+                      </div>
+                      <div className="text-xs text-slate-500">
+                        Predictive analysis using machine learning
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs px-2 py-1 rounded-full bg-purple-500/20 text-purple-300">
+                        Confidence: {analytics.analytics_confidence?.temperature || 0}%
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {/* Temperature Predictions */}
+                    <div className="rounded-2xl bg-slate-900/50 p-4 ring-1 ring-white/10">
+                      <div className="flex items-center justify-between mb-3">
+                        <div className="text-xs text-slate-400">Temperature Trend</div>
+                        <div className={`text-xs px-2 py-1 rounded-full ${
+                          analytics.predictions?.temperature?.trend === 'increasing' 
+                            ? 'bg-red-500/20 text-red-300' 
+                            : analytics.predictions?.temperature?.trend === 'decreasing'
+                            ? 'bg-blue-500/20 text-blue-300'
+                            : 'bg-slate-500/20 text-slate-300'
+                        }`}>
+                          {analytics.predictions?.temperature?.trend?.toUpperCase()}
+                        </div>
+                      </div>
+                      <div className="text-2xl font-bold">
+                        {analytics.predictions?.temperature?.slope > 0 ? '+' : ''}
+                        {analytics.predictions?.temperature?.slope || 0}°C/day
+                      </div>
+                      <div className="text-xs text-slate-400 mt-2">Next 7 days:</div>
+                      <div className="flex gap-2 mt-1">
+                        {(analytics.predictions?.temperature?.next_7_days || []).map((temp, idx) => (
+                          <div key={idx} className="text-sm">
+                            {Math.round(temp)}°
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Rainfall Predictions */}
+                    <div className="rounded-2xl bg-slate-900/50 p-4 ring-1 ring-white/10">
+                      <div className="flex items-center justify-between mb-3">
+                        <div className="text-xs text-slate-400">Rainfall Analysis</div>
+                        <div className={`text-xs px-2 py-1 rounded-full ${
+                          analytics.predictions?.rainfall?.trend === 'increasing' 
+                            ? 'bg-blue-500/20 text-blue-300' 
+                            : analytics.predictions?.rainfall?.trend === 'decreasing'
+                            ? 'bg-blue-400/20 text-blue-300'
+                            : 'bg-slate-500/20 text-slate-300'
+                        }`}>
+                          {analytics.predictions?.rainfall?.trend?.toUpperCase()}
+                        </div>
+                      </div>
+                      <div className="text-2xl font-bold">
+                        Avg: {Math.round(analytics.historical_summary?.avg_rain_prob || 0)}%
+                      </div>
+                      <div className="text-xs text-slate-400 mt-2">
+                        High risk days: {analytics.predictions?.rainfall?.high_risk_days?.length || 0}
+                      </div>
+                      <div className="flex gap-1 mt-2">
+                        {(analytics.predictions?.rainfall?.next_7_days || []).map((rain, idx) => (
+                          <div 
+                            key={idx} 
+                            className={`text-xs px-2 py-1 rounded ${
+                              rain > 70 ? 'bg-blue-500/30 text-blue-200' :
+                              rain > 40 ? 'bg-blue-500/20 text-blue-300' :
+                              'bg-slate-700/30 text-slate-400'
+                            }`}
+                          >
+                            {Math.round(rain)}%
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Insights */}
+                  <div className="mt-4 pt-4 border-t border-white/10">
+                    <div className="text-xs text-slate-400 mb-2">AI Insights:</div>
+                    <div className="space-y-1">
+                      {(analytics.insights || []).map((insight, idx) => (
+                        <div key={idx} className="text-sm text-slate-300 flex items-start gap-2">
+                          <span className="mt-1">•</span>
+                          <span>{insight}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Model Info */}
+                  <div className="mt-4 text-xs text-slate-500">
+                    Model: {analytics.regression_metrics?.model} • 
+                    Analyzed {analytics.historical_summary?.days_analyzed || 0} days • 
+                    σ={analytics.historical_summary?.temperature_std || 0}°C
+                  </div>
+                </section>
+              )}
 
               {/* CHART ROW */}
               <section className="rounded-3xl bg-slate-900/80 ring-1 ring-white/5 p-5 shadow-lg shadow-black/40">
