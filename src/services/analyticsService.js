@@ -1,6 +1,8 @@
 // src/services/analyticsService.js
-const API_BASE = import.meta.env.VITE_API_BASE_URL?.replace(/\/+$/, "");
+const FALLBACK_API_BASE = "https://itl-411-finals-backend.onrender.com/api";
 
+const API_BASE = (import.meta.env.VITE_API_BASE_URL || FALLBACK_API_BASE)
+  .replace(/\/+$/, ""); 
 function buildUrl(path, params = {}) {
   if (!API_BASE) throw new Error("VITE_API_BASE_URL is not set");
   const url = new URL(`${API_BASE}/${String(path).replace(/^\/+/, "")}`);
@@ -12,7 +14,13 @@ function buildUrl(path, params = {}) {
 
 async function apiGet(path, params = {}) {
   const url = buildUrl(path, params);
-  const res = await fetch(url.toString(), { credentials: "include" });
+
+  console.log("Calling API:", url.toString()); // temporary debug
+
+  const res = await fetch(url.toString(), {
+    headers: { Accept: "application/json" },
+  });
+
   const text = await res.text();
   if (!res.ok) throw new Error(`HTTP ${res.status}: ${text || res.statusText}`);
   return text ? JSON.parse(text) : null;
