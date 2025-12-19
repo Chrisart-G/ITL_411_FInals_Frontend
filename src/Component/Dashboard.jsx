@@ -1,16 +1,9 @@
 // src/Component/Dashboard.jsx
-import React, {
-  useEffect,
-  useMemo,
-  useState,
-  useRef,
-} from "react";
+import React, { useEffect, useMemo, useState, useRef } from "react";
 import {
   fetchWeatherSummary,
   fetchWeatherAnalytics,
 } from "../services/analyticsService";
-
-/* ---------- Formatting helpers ---------- */
 
 const fmt = {
   temp: (n) => (n == null ? "—" : `${Math.round(n)}°C`),
@@ -54,7 +47,6 @@ const iconFor = (pop, rainMm) => {
   return "☀️";
 };
 
-/* ---------- Weather Advisory Helper ---------- */
 const getDailyOutfitAdvisory = (dayData, index) => {
   if (!dayData) return { items: [], advisoryLevel: "normal", color: "emerald" };
 
@@ -67,7 +59,6 @@ const getDailyOutfitAdvisory = (dayData, index) => {
   let advisoryLevel = "normal";
   let color = "emerald";
 
-  // Temperature-based recommendations
   if (tempMax >= 32) {
     advisoryLevel = "hot";
     color = "red";
@@ -94,7 +85,6 @@ const getDailyOutfitAdvisory = (dayData, index) => {
     items.push({ icon: "👕", item: "T-shirt", category: "clothing" });
   }
 
-  // Rain-based items
   if (pop >= 80 || rainMm >= 5) {
     advisoryLevel = "rainy";
     color = "indigo";
@@ -110,7 +100,6 @@ const getDailyOutfitAdvisory = (dayData, index) => {
     }
   }
 
-  // Always recommend essentials for hot days
   if (tempMax >= 25 && !items.some((item) => item.item === "Water")) {
     items.push({ icon: "💧", item: "Water", category: "essential" });
   }
@@ -123,8 +112,6 @@ const getDailyOutfitAdvisory = (dayData, index) => {
   };
 };
 
-/* ---------- PH Locations (region → province → cities/municipalities) ---------- */
-
 const PH_LOCATIONS = [
   {
     id: "luzon",
@@ -134,32 +121,20 @@ const PH_LOCATIONS = [
         id: "ncr",
         label: "Metro Manila",
         cities: [
-          {
-            label: "Manila",
-            query: "Manila, Metro Manila, Philippines",
-          },
+          { label: "Manila", query: "Manila, Metro Manila, Philippines" },
           {
             label: "Quezon City",
             query: "Quezon City, Metro Manila, Philippines",
           },
-          {
-            label: "Pasig City",
-            query: "Pasig City, Metro Manila, Philippines",
-          },
+          { label: "Pasig City", query: "Pasig City, Metro Manila, Philippines" },
         ],
       },
       {
         id: "cavite",
         label: "Cavite",
         cities: [
-          {
-            label: "Tagaytay City",
-            query: "Tagaytay City, Cavite, Philippines",
-          },
-          {
-            label: "Imus City",
-            query: "Imus City, Cavite, Philippines",
-          },
+          { label: "Tagaytay City", query: "Tagaytay City, Cavite, Philippines" },
+          { label: "Imus City", query: "Imus City, Cavite, Philippines" },
         ],
       },
     ],
@@ -176,38 +151,24 @@ const PH_LOCATIONS = [
             label: "Bacolod City",
             query: "Bacolod City, Negros Occidental, Philippines",
           },
-          {
-            label: "Bago City",
-            query: "Bago City, Negros Occidental, Philippines",
-          },
+          { label: "Bago City", query: "Bago City, Negros Occidental, Philippines" },
           {
             label: "Calero, Bago City",
             query: "Calero, Bago City, Negros Occidental, Philippines",
           },
-          {
-            label: "Murcia",
-            query: "Murcia, Negros Occidental, Philippines",
-          },
+          { label: "Murcia", query: "Murcia, Negros Occidental, Philippines" },
         ],
       },
       {
         id: "iloilo",
         label: "Iloilo",
-        cities: [
-          {
-            label: "Iloilo City",
-            query: "Iloilo City, Iloilo, Philippines",
-          },
-        ],
+        cities: [{ label: "Iloilo City", query: "Iloilo City, Iloilo, Philippines" }],
       },
       {
         id: "cebu",
         label: "Cebu",
         cities: [
-          {
-            label: "Cebu City",
-            query: "Cebu City, Cebu, Philippines",
-          },
+          { label: "Cebu City", query: "Cebu City, Cebu, Philippines" },
           {
             label: "Lapu-Lapu City",
             query: "Lapu-Lapu City, Cebu, Philippines",
@@ -223,12 +184,7 @@ const PH_LOCATIONS = [
       {
         id: "davao-del-sur",
         label: "Davao del Sur",
-        cities: [
-          {
-            label: "Davao City",
-            query: "Davao City, Davao del Sur, Philippines",
-          },
-        ],
+        cities: [{ label: "Davao City", query: "Davao City, Davao del Sur, Philippines" }],
       },
       {
         id: "misamis-oriental",
@@ -254,14 +210,10 @@ const PH_LOCATIONS = [
   },
 ];
 
-/* ---------- Dashboard component ---------- */
-
 export default function Dashboard() {
-  // backend query string
   const [cityQuery, setCityQuery] = useState(
     "Bacolod City, Negros Occidental, Philippines"
   );
-  // label shown in selector
   const [locationLabel, setLocationLabel] = useState(
     "Bacolod City • Negros Occidental • Visayas"
   );
@@ -271,14 +223,69 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState("");
 
-  // mobile nav state
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
 
-  // section refs for smooth scroll
   const heroRef = useRef(null);
   const forecastRef = useRef(null);
   const analyticsRef = useRef(null);
   const chartRef = useRef(null);
+
+  useEffect(() => {
+    const html = document.documentElement;
+    const body = document.body;
+
+    const prevHtmlColorScheme = html.style.colorScheme;
+    const prevBodyBg = body.style.backgroundColor;
+    const prevBodyColor = body.style.color;
+
+    const addedBodyClasses = ["bg-slate-950", "text-slate-100"];
+    body.classList.add(...addedBodyClasses);
+
+    html.style.colorScheme = "dark";
+    body.style.backgroundColor = "#020617";
+    body.style.color = "#f1f5f9";
+
+    let csMeta = document.querySelector('meta[name="color-scheme"]');
+    const csPrev = csMeta?.getAttribute("content") ?? null;
+    let csCreated = false;
+    if (!csMeta) {
+      csMeta = document.createElement("meta");
+      csMeta.setAttribute("name", "color-scheme");
+      document.head.appendChild(csMeta);
+      csCreated = true;
+    }
+    csMeta.setAttribute("content", "dark");
+
+    let themeMeta = document.querySelector('meta[name="theme-color"]');
+    const themePrev = themeMeta?.getAttribute("content") ?? null;
+    let themeCreated = false;
+    if (!themeMeta) {
+      themeMeta = document.createElement("meta");
+      themeMeta.setAttribute("name", "theme-color");
+      document.head.appendChild(themeMeta);
+      themeCreated = true;
+    }
+    themeMeta.setAttribute("content", "#020617");
+
+    return () => {
+      html.style.colorScheme = prevHtmlColorScheme;
+      body.style.backgroundColor = prevBodyBg;
+      body.style.color = prevBodyColor;
+      body.classList.remove(...addedBodyClasses);
+
+      if (csMeta) {
+        if (csCreated) csMeta.remove();
+        else if (csPrev != null) csMeta.setAttribute("content", csPrev);
+        else csMeta.removeAttribute("content");
+      }
+
+      if (themeMeta) {
+        if (themeCreated) themeMeta.remove();
+        else if (themePrev != null) themeMeta.setAttribute("content", themePrev);
+        else themeMeta.removeAttribute("content");
+      }
+    };
+  }, []);
 
   const scrollToSection = (ref) => {
     if (ref && ref.current) {
@@ -308,7 +315,6 @@ export default function Dashboard() {
 
   useEffect(() => {
     load();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cityQuery]);
 
   const temps = useMemo(
@@ -321,7 +327,6 @@ export default function Dashboard() {
   );
   const labels = useMemo(() => (wx?.daily || []).map((d) => d.date), [wx]);
 
-  // outfit advisories
   const dailyOutfitAdvisories = useMemo(
     () =>
       (wx?.daily || [])
@@ -338,7 +343,6 @@ export default function Dashboard() {
     setLocationLabel(loc.display);
   };
 
-  // nav click handlers (desktop + mobile)
   const handleDashboardClick = () => {
     scrollToSection(heroRef);
     setMobileNavOpen(false);
@@ -357,8 +361,10 @@ export default function Dashboard() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 flex overflow-hidden">
-      {/* DESKTOP SIDEBAR */}
+    <div
+      className="min-h-screen bg-slate-950 text-slate-100 flex overflow-hidden [color-scheme:dark] [forced-color-adjust:none]"
+      style={{ colorScheme: "dark" }}
+    >
       <aside className="hidden md:flex w-64 lg:w-72 flex-col border-r border-slate-800 bg-slate-950/95 px-6 py-6">
         <div className="flex items-center gap-3 mb-8">
           <div className="flex h-9 w-9 items-center justify-center rounded-2xl bg-violet-500/90 shadow-lg shadow-violet-500/40">
@@ -397,7 +403,6 @@ export default function Dashboard() {
         </div>
       </aside>
 
-      {/* MOBILE NAV OVERLAY */}
       {mobileNavOpen && (
         <div
           className="fixed inset-0 z-40 bg-black/60 md:hidden"
@@ -414,9 +419,7 @@ export default function Dashboard() {
                 </div>
                 <div>
                   <p className="text-sm font-semibold">SkySense</p>
-                  <p className="text-[11px] text-slate-500">
-                    Weather Suite
-                  </p>
+                  <p className="text-[11px] text-slate-500">Weather Suite</p>
                 </div>
               </div>
               <button
@@ -457,12 +460,9 @@ export default function Dashboard() {
         </div>
       )}
 
-      {/* MAIN COLUMN */}
       <div className="flex-1 flex flex-col">
-        {/* TOP BAR */}
         <header className="sticky top-0 z-30 flex items-center justify-between gap-3 border-b border-slate-800 bg-slate-950/95 px-4 py-3 md:px-8 backdrop-blur">
           <div className="flex items-center gap-3">
-            {/* mobile burger */}
             <button
               type="button"
               className="md:hidden inline-flex h-9 w-9 items-center justify-center rounded-xl border border-slate-700 bg-slate-900 text-slate-100"
@@ -485,7 +485,6 @@ export default function Dashboard() {
             </div>
           </div>
 
-          {/* Location selector */}
           <LocationSelector
             locations={PH_LOCATIONS}
             selectedLabel={locationLabel}
@@ -493,7 +492,6 @@ export default function Dashboard() {
           />
         </header>
 
-        {/* CONTENT */}
         <main className="flex-1 overflow-y-auto px-4 py-5 md:px-8 md:py-8">
           {err && (
             <div className="mb-4 rounded-2xl border border-red-400/30 bg-red-900/20 px-4 py-3 text-sm text-red-200">
@@ -505,12 +503,10 @@ export default function Dashboard() {
             <Skeleton />
           ) : wx ? (
             <div className="space-y-6">
-              {/* HERO + HIGHLIGHTS */}
               <div
                 ref={heroRef}
                 className="grid gap-6 xl:grid-cols-[minmax(0,2.2fr)_minmax(0,1.4fr)]"
               >
-                {/* HERO CARD */}
                 <section className="rounded-3xl bg-gradient-to-br from-slate-900 to-slate-950 ring-1 ring-white/5 p-5 md:p-7 shadow-xl shadow-black/40">
                   <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-6">
                     <div>
@@ -534,17 +530,13 @@ export default function Dashboard() {
                           </div>
                         </div>
                         <div className="hidden sm:block text-5xl md:text-6xl lg:text-7xl select-none">
-                          {iconFor(
-                            wx.daily?.[0]?.pop,
-                            wx.daily?.[0]?.rain_mm
-                          )}
+                          {iconFor(wx.daily?.[0]?.pop, wx.daily?.[0]?.rain_mm)}
                         </div>
                       </div>
 
                       <div className="mt-4 text-base md:text-lg">
-                        {(wx.current?.description || "").replace(
-                          /\b\w/g,
-                          (c) => c.toUpperCase()
+                        {(wx.current?.description || "").replace(/\b\w/g, (c) =>
+                          c.toUpperCase()
                         )}
                       </div>
                       <div className="text-xs md:text-sm text-slate-400 mt-1">
@@ -552,7 +544,6 @@ export default function Dashboard() {
                       </div>
                     </div>
 
-                    {/* QUICK METRICS */}
                     <div className="grid grid-cols-2 gap-3 md:w-64">
                       <MiniMetric
                         label="Sunrise"
@@ -586,7 +577,6 @@ export default function Dashboard() {
                   </div>
                 </section>
 
-                {/* HIGHLIGHTS */}
                 <section className="grid gap-4 sm:grid-cols-2">
                   <Highlight title="Chance of Rain">
                     <div className="text-2xl md:text-3xl font-extrabold">
@@ -633,7 +623,6 @@ export default function Dashboard() {
                 </section>
               </div>
 
-              {/* FORECAST + LOCATION DETAILS */}
               <div
                 ref={forecastRef}
                 className="grid gap-6 lg:grid-cols-[minmax(0,2fr)_minmax(0,1.1fr)]"
@@ -641,9 +630,7 @@ export default function Dashboard() {
                 <section className="rounded-3xl bg-slate-900/80 ring-1 ring-white/5 p-4 md:p-5 shadow-lg shadow-black/40">
                   <div className="mb-4 flex items-center justify-between">
                     <div>
-                      <div className="text-sm text-slate-300">
-                        Next 5 days
-                      </div>
+                      <div className="text-sm text-slate-300">Next 5 days</div>
                       <div className="text-xs text-slate-500">
                         Daily high, low, and rain chance
                       </div>
@@ -661,9 +648,7 @@ export default function Dashboard() {
                         <div className="mt-2 text-3xl leading-none">
                           {iconFor(d.pop, d.rain_mm)}
                         </div>
-                        <div className="mt-2 font-semibold">
-                          {fmt.temp(d.temp_max)}
-                        </div>
+                        <div className="mt-2 font-semibold">{fmt.temp(d.temp_max)}</div>
                         <div className="text-[11px] text-slate-400">
                           min {fmt.temp(d.temp_min)}
                         </div>
@@ -677,9 +662,7 @@ export default function Dashboard() {
 
                 <section className="rounded-3xl bg-slate-900/80 ring-1 ring-white/5 p-4 md:p-5 flex flex-col justify-between shadow-lg shadow-black/40">
                   <div>
-                    <div className="text-sm text-slate-300">
-                      Location details
-                    </div>
+                    <div className="text-sm text-slate-300">Location details</div>
                     <p className="mt-1 text-xs text-slate-500">
                       Coordinates &amp; meta information
                     </p>
@@ -687,35 +670,24 @@ export default function Dashboard() {
                   <div className="mt-4 space-y-2 text-sm">
                     <div className="flex items-center justify-between">
                       <span className="text-slate-400">Latitude</span>
-                      <span className="font-medium">
-                        {wx.lat?.toFixed(3) ?? "—"}
-                      </span>
+                      <span className="font-medium">{wx.lat?.toFixed(3) ?? "—"}</span>
                     </div>
                     <div className="flex items-center justify-between">
                       <span className="text-slate-400">Longitude</span>
-                      <span className="font-medium">
-                        {wx.lon?.toFixed(3) ?? "—"}
-                      </span>
+                      <span className="font-medium">{wx.lon?.toFixed(3) ?? "—"}</span>
                     </div>
                     <div className="flex items-center justify-between">
                       <span className="text-slate-400">Timezone</span>
-                      <span className="font-medium">
-                        {wx.timezone ?? "—"}
-                      </span>
+                      <span className="font-medium">{wx.timezone ?? "—"}</span>
                     </div>
                   </div>
                 </section>
               </div>
 
-              {/* DAILY OUTFIT ADVISORY */}
-              <section
-                className="rounded-3xl bg-gradient-to-br from-amber-900/20 to-orange-900/30 ring-1 ring-white/5 p-4 md:p-5 shadow-lg shadow-black/40"
-              >
+              <section className="rounded-3xl bg-gradient-to-br from-amber-900/20 to-orange-900/30 ring-1 ring-white/5 p-4 md:p-5 shadow-lg shadow-black/40">
                 <div className="mb-5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                   <div>
-                    <div className="text-sm text-slate-300">
-                      👕 Daily Outfit Advisory
-                    </div>
+                    <div className="text-sm text-slate-300">👕 Daily Outfit Advisory</div>
                     <div className="text-xs text-slate-500">
                       What to wear in these days - Plan your outfits
                     </div>
@@ -743,17 +715,12 @@ export default function Dashboard() {
                     >
                       <div className="flex items-center justify-between mb-3">
                         <div>
-                          <div className="text-sm font-medium">
-                            {day.outfitAdvisory.dayName}
-                          </div>
+                          <div className="text-sm font-medium">{day.outfitAdvisory.dayName}</div>
                           <div className="text-xs text-slate-400">
-                            {fmt.temp(day.temp_max)} /{" "}
-                            {fmt.temp(day.temp_min)}
+                            {fmt.temp(day.temp_max)} / {fmt.temp(day.temp_min)}
                           </div>
                         </div>
-                        <div className="text-2xl">
-                          {iconFor(day.pop, day.rain_mm)}
-                        </div>
+                        <div className="text-2xl">{iconFor(day.pop, day.rain_mm)}</div>
                       </div>
 
                       <div className="mb-3">
@@ -775,19 +742,12 @@ export default function Dashboard() {
                       </div>
 
                       <div className="space-y-2">
-                        <div className="text-xs text-slate-400">
-                          Recommended items:
-                        </div>
+                        <div className="text-xs text-slate-400">Recommended items:</div>
                         <div className="space-y-1">
                           {day.outfitAdvisory.items.map((item, idx) => (
-                            <div
-                              key={idx}
-                              className="flex items-center gap-2 text-xs"
-                            >
+                            <div key={idx} className="flex items-center gap-2 text-xs">
                               <span className="text-base">{item.icon}</span>
-                              <span className="text-slate-200">
-                                {item.item}
-                              </span>
+                              <span className="text-slate-200">{item.item}</span>
                             </div>
                           ))}
                         </div>
@@ -796,9 +756,7 @@ export default function Dashboard() {
                       {day.pop >= 50 && (
                         <div className="mt-3 text-xs text-blue-300 flex items-center gap-1">
                           <span>☔</span>
-                          <span>
-                            Bring umbrella ({fmt.pct(day.pop)})
-                          </span>
+                          <span>Bring umbrella ({fmt.pct(day.pop)})</span>
                         </div>
                       )}
                       {day.temp_max >= 30 && (
@@ -812,39 +770,28 @@ export default function Dashboard() {
                 </div>
 
                 <div className="mt-5 pt-4 border-t border-white/10">
-                  <div className="text-xs text-slate-400 mb-2">
-                    💡 Pro tips:
-                  </div>
+                  <div className="text-xs text-slate-400 mb-2">💡 Pro tips:</div>
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-xs">
                     <div className="flex items-center gap-1">
                       <span>🔥 Hot days:</span>
-                      <span className="text-slate-300">
-                        Light clothes, sunscreen
-                      </span>
+                      <span className="text-slate-300">Light clothes, sunscreen</span>
                     </div>
                     <div className="flex items-center gap-1">
                       <span>🌧️ Rainy:</span>
-                      <span className="text-slate-300">
-                        Umbrella, waterproof
-                      </span>
+                      <span className="text-slate-300">Umbrella, waterproof</span>
                     </div>
                     <div className="flex items-center gap-1">
                       <span>❄️ Cool:</span>
-                      <span className="text-slate-300">
-                        Layer up, jacket
-                      </span>
+                      <span className="text-slate-300">Layer up, jacket</span>
                     </div>
                     <div className="flex items-center gap-1">
                       <span>☀️ Sunny:</span>
-                      <span className="text-slate-300">
-                        Hat, sunglasses
-                      </span>
+                      <span className="text-slate-300">Hat, sunglasses</span>
                     </div>
                   </div>
                 </div>
               </section>
 
-              {/* LINEAR REGRESSION ANALYTICS */}
               {analytics && (
                 <section
                   ref={analyticsRef}
@@ -852,35 +799,27 @@ export default function Dashboard() {
                 >
                   <div className="mb-4 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
                     <div>
-                      <div className="text-sm text-slate-300">
-                        📈 Linear Regression Analytics
-                      </div>
+                      <div className="text-sm text-slate-300">📈 Linear Regression Analytics</div>
                       <div className="text-xs text-slate-500">
                         Predictive analysis using machine learning
                       </div>
                     </div>
                     <div className="flex items-center gap-2">
                       <span className="text-xs px-2 py-1 rounded-full bg-purple-500/20 text-purple-300">
-                        Confidence:{" "}
-                        {analytics.analytics_confidence?.temperature || 0}%
+                        Confidence: {analytics.analytics_confidence?.temperature || 0}%
                       </span>
                     </div>
                   </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {/* Temperature Predictions */}
                     <div className="rounded-2xl bg-slate-900/50 p-4 ring-1 ring-white/10">
                       <div className="flex items-center justify-between mb-3">
-                        <div className="text-xs text-slate-400">
-                          Temperature Trend
-                        </div>
+                        <div className="text-xs text-slate-400">Temperature Trend</div>
                         <div
                           className={`text-xs px-2 py-1 rounded-full ${
-                            analytics.predictions?.temperature?.trend ===
-                            "increasing"
+                            analytics.predictions?.temperature?.trend === "increasing"
                               ? "bg-red-500/20 text-red-300"
-                              : analytics.predictions?.temperature?.trend ===
-                                "decreasing"
+                              : analytics.predictions?.temperature?.trend === "decreasing"
                               ? "bg-blue-500/20 text-blue-300"
                               : "bg-slate-500/20 text-slate-300"
                           }`}
@@ -889,39 +828,29 @@ export default function Dashboard() {
                         </div>
                       </div>
                       <div className="text-2xl font-bold">
-                        {analytics.predictions?.temperature?.slope > 0
-                          ? "+"
-                          : ""}
-                        {analytics.predictions?.temperature?.slope || 0}
-                        °C/day
+                        {analytics.predictions?.temperature?.slope > 0 ? "+" : ""}
+                        {analytics.predictions?.temperature?.slope || 0}°C/day
                       </div>
-                      <div className="text-xs text-slate-400 mt-2">
-                        Next 7 days:
-                      </div>
+                      <div className="text-xs text-slate-400 mt-2">Next 7 days:</div>
                       <div className="flex flex-wrap gap-2 mt-1">
-                        {(analytics.predictions?.temperature?.next_7_days ||
-                          []
-                        ).map((temp, idx) => (
-                          <div key={idx} className="text-sm">
-                            {Math.round(temp)}°
-                          </div>
-                        ))}
+                        {(analytics.predictions?.temperature?.next_7_days || []).map(
+                          (temp, idx) => (
+                            <div key={idx} className="text-sm">
+                              {Math.round(temp)}°
+                            </div>
+                          )
+                        )}
                       </div>
                     </div>
 
-                    {/* Rainfall Predictions */}
                     <div className="rounded-2xl bg-slate-900/50 p-4 ring-1 ring-white/10">
                       <div className="flex items-center justify-between mb-3">
-                        <div className="text-xs text-slate-400">
-                          Rainfall Analysis
-                        </div>
+                        <div className="text-xs text-slate-400">Rainfall Analysis</div>
                         <div
                           className={`text-xs px-2 py-1 rounded-full ${
-                            analytics.predictions?.rainfall?.trend ===
-                            "increasing"
+                            analytics.predictions?.rainfall?.trend === "increasing"
                               ? "bg-blue-500/20 text-blue-300"
-                              : analytics.predictions?.rainfall?.trend ===
-                                "decreasing"
+                              : analytics.predictions?.rainfall?.trend === "decreasing"
                               ? "bg-blue-400/20 text-blue-300"
                               : "bg-slate-500/20 text-slate-300"
                           }`}
@@ -930,16 +859,10 @@ export default function Dashboard() {
                         </div>
                       </div>
                       <div className="text-2xl font-bold">
-                        Avg:{" "}
-                        {Math.round(
-                          analytics.historical_summary?.avg_rain_prob || 0
-                        )}
-                        %
+                        Avg: {Math.round(analytics.historical_summary?.avg_rain_prob || 0)}%
                       </div>
                       <div className="text-xs text-slate-400 mt-2">
-                        High risk days:{" "}
-                        {analytics.predictions?.rainfall?.high_risk_days
-                          ?.length || 0}
+                        High risk days: {analytics.predictions?.rainfall?.high_risk_days?.length || 0}
                       </div>
                       <div className="flex flex-wrap gap-1 mt-2">
                         {(analytics.predictions?.rainfall?.next_7_days || []).map(
@@ -962,11 +885,8 @@ export default function Dashboard() {
                     </div>
                   </div>
 
-                  {/* Insights */}
                   <div className="mt-4 pt-4 border-t border-white/10">
-                    <div className="text-xs text-slate-400 mb-2">
-                      AI Insights:
-                    </div>
+                    <div className="text-xs text-slate-400 mb-2">AI Insights:</div>
                     <div className="space-y-1">
                       {(analytics.insights || []).map((insight, idx) => (
                         <div
@@ -982,13 +902,12 @@ export default function Dashboard() {
 
                   <div className="mt-4 text-xs text-slate-500">
                     Model: {analytics.regression_metrics?.model} • Analyzed{" "}
-                    {analytics.historical_summary?.days_analyzed || 0} days •
-                    σ={analytics.historical_summary?.temperature_std || 0}°C
+                    {analytics.historical_summary?.days_analyzed || 0} days • σ=
+                    {analytics.historical_summary?.temperature_std || 0}°C
                   </div>
                 </section>
               )}
 
-              {/* CHART ROW */}
               <section
                 ref={chartRef}
                 className="rounded-3xl bg-slate-900/80 ring-1 ring-white/5 p-4 md:p-5 shadow-lg shadow-black/40"
@@ -1013,8 +932,6 @@ export default function Dashboard() {
   );
 }
 
-/* ---------- Location Selector ---------- */
-
 function LocationSelector({ locations, selectedLabel, onChange }) {
   const [open, setOpen] = useState(false);
   const [regionId, setRegionId] = useState("visayas");
@@ -1023,8 +940,7 @@ function LocationSelector({ locations, selectedLabel, onChange }) {
 
   const region = locations.find((r) => r.id === regionId) || locations[0];
   const provinces = region?.provinces || [];
-  const province =
-    provinces.find((p) => p.id === provinceId) || provinces[0] || null;
+  const province = provinces.find((p) => p.id === provinceId) || provinces[0] || null;
   const cities = province?.cities || [];
 
   const filteredCities = useMemo(() => {
@@ -1048,10 +964,7 @@ function LocationSelector({ locations, selectedLabel, onChange }) {
 
   const handleCitySelect = (cityObj) => {
     const display = `${cityObj.label} • ${province?.label} • ${region?.label}`;
-    onChange({
-      query: cityObj.query,
-      display,
-    });
+    onChange({ query: cityObj.query, display });
     setOpen(false);
   };
 
@@ -1061,19 +974,19 @@ function LocationSelector({ locations, selectedLabel, onChange }) {
         type="button"
         onClick={() => setOpen((o) => !o)}
         className="min-w-[220px] sm:min-w-[260px] md:min-w-[320px] flex items-center justify-between rounded-2xl bg-slate-900/80 px-3 py-2 text-left text-slate-100 ring-1 ring-violet-500/60 focus:ring-2 focus:ring-violet-400 outline-none"
+        style={{ colorScheme: "dark" }}
       >
         <span className="truncate">{selectedLabel}</span>
         <span className="ml-2 text-violet-400">▾</span>
       </button>
 
       {open && (
-        <div className="absolute right-0 mt-2 w-[320px] sm:w-[380px] md:w-[420px] rounded-2xl bg-slate-900/95 ring-1 ring-white/10 shadow-xl shadow-black/40 z-30">
+        <div className="absolute right-0 mt-2 w-[320px] sm:w-[380px] md:w-[420px] rounded-2xl bg-slate-900/95 ring-1 ring-white/10 shadow-xl shadow-black/40 z-30 [color-scheme:dark] [forced-color-adjust:none]">
           <div className="p-3 border-b border-slate-800">
             <p className="text-[11px] uppercase tracking-wide text-slate-400 mb-2">
               Select location (Philippines)
             </p>
 
-            {/* Region toggles */}
             <div className="flex gap-2 mb-3">
               {locations.map((r) => (
                 <button
@@ -1091,11 +1004,11 @@ function LocationSelector({ locations, selectedLabel, onChange }) {
               ))}
             </div>
 
-            {/* Province select */}
             <select
               value={province?.id || ""}
               onChange={handleProvinceChange}
               className="w-full rounded-xl bg-slate-950/90 px-3 py-2 text-xs text-slate-100 ring-1 ring-slate-700 focus:ring-violet-500 outline-none"
+              style={{ colorScheme: "dark" }}
             >
               {provinces.map((p) => (
                 <option key={p.id} value={p.id}>
@@ -1105,19 +1018,17 @@ function LocationSelector({ locations, selectedLabel, onChange }) {
             </select>
           </div>
 
-          {/* City search & list */}
           <div className="p-3">
             <input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Search city / municipality…"
               className="w-full rounded-xl bg-slate-950/90 px-3 py-2 text-xs text-slate-100 placeholder:text-slate-500 ring-1 ring-slate-700 focus:ring-violet-500 outline-none mb-2"
+              style={{ colorScheme: "dark" }}
             />
             <div className="max-h-56 overflow-y-auto text-xs">
               {filteredCities.length === 0 ? (
-                <div className="px-2 py-2 text-slate-500">
-                  No results in this province
-                </div>
+                <div className="px-2 py-2 text-slate-500">No results in this province</div>
               ) : (
                 filteredCities.map((c) => (
                   <button
@@ -1137,8 +1048,6 @@ function LocationSelector({ locations, selectedLabel, onChange }) {
     </div>
   );
 }
-
-/* ---------- Small UI pieces ---------- */
 
 function NavItem({ children, active, onClick }) {
   return (
@@ -1173,9 +1082,7 @@ function MiniMetric({ label, value, icon }) {
 function Highlight({ title, children }) {
   return (
     <div className="rounded-3xl bg-gradient-to-br from-slate-900/90 to-slate-950 ring-1 ring-white/5 p-4">
-      <div className="text-[11px] uppercase tracking-wide text-slate-400">
-        {title}
-      </div>
+      <div className="text-[11px] uppercase tracking-wide text-slate-400">{title}</div>
       <div className="mt-2">{children}</div>
     </div>
   );
@@ -1188,10 +1095,7 @@ function Skeleton() {
         <div className="h-52 rounded-3xl bg-slate-800/40 animate-pulse" />
         <div className="grid grid-cols-2 gap-4">
           {Array.from({ length: 4 }).map((_, i) => (
-            <div
-              key={i}
-              className="h-24 rounded-3xl bg-slate-800/40 animate-pulse"
-            />
+            <div key={i} className="h-24 rounded-3xl bg-slate-800/40 animate-pulse" />
           ))}
         </div>
       </div>
@@ -1201,7 +1105,6 @@ function Skeleton() {
   );
 }
 
-/** Pure SVG chart: temp line + rain bars (all real API values). */
 function TempRainChart({ temps = [], rains = [], labels = [] }) {
   const w = 1100;
   const h = 260;
@@ -1209,8 +1112,7 @@ function TempRainChart({ temps = [], rains = [], labels = [] }) {
   const innerW = w - pad * 2;
   const innerH = h - pad * 2;
 
-  if (!temps.length)
-    return <div className="h-56 rounded-2xl bg-slate-800/40" />;
+  if (!temps.length) return <div className="h-56 rounded-2xl bg-slate-800/40" />;
 
   const tMin = Math.min(...temps);
   const tMax = Math.max(...temps);
@@ -1240,12 +1142,10 @@ function TempRainChart({ temps = [], rains = [], labels = [] }) {
   });
 
   return (
-    <div className="overflow-x-auto rounded-2xl bg-slate-950/60 p-2">
+    <div className="overflow-x-auto rounded-2xl bg-slate-950/60 p-2 [color-scheme:dark] [forced-color-adjust:none]">
       <svg width={w} height={h} className="block">
-        {/* grid */}
         {gridLines}
 
-        {/* rain bars */}
         {rains.map((p, i) => {
           const bw = (innerW / rains.length) * 0.5;
           const cx = x(i) - bw / 2;
@@ -1264,25 +1164,12 @@ function TempRainChart({ temps = [], rains = [], labels = [] }) {
           );
         })}
 
-        {/* temperature line */}
-        <path
-          d={line}
-          className="stroke-red-400 fill-none"
-          strokeWidth="2.5"
-        />
+        <path d={line} className="stroke-red-400 fill-none" strokeWidth="2.5" />
 
-        {/* temp points */}
         {temps.map((v, i) => (
-          <circle
-            key={i}
-            cx={x(i)}
-            cy={yTemp(v)}
-            r="3"
-            className="fill-red-400"
-          />
+          <circle key={i} cx={x(i)} cy={yTemp(v)} r="3" className="fill-red-400" />
         ))}
 
-        {/* x labels */}
         {labels.map((d, i) => (
           <text
             key={i}
@@ -1291,34 +1178,21 @@ function TempRainChart({ temps = [], rains = [], labels = [] }) {
             textAnchor="middle"
             className="fill-slate-400 text-[10px]"
           >
-            {new Date(d).toLocaleDateString(undefined, {
-              month: "2-digit",
-              day: "2-digit",
-            })}
+            {new Date(d).toLocaleDateString(undefined, { month: "2-digit", day: "2-digit" })}
           </text>
         ))}
 
-        {/* y axis labels (°C on left) */}
         {Array.from({ length: ticksY + 1 }).map((_, i) => {
           const val = Math.round(tMax - (i / ticksY) * (tMax - tMin));
           const yy = pad + (i / ticksY) * innerH + 3;
           return (
-            <text
-              key={i}
-              x={8}
-              y={yy}
-              className="fill-slate-400 text-[10px]"
-            >
+            <text key={i} x={8} y={yy} className="fill-slate-400 text-[10px]">
               {val}°C
             </text>
           );
         })}
 
-        <text
-          x={w - 24}
-          y={pad - 8}
-          className="fill-slate-400 text-[10px]"
-        >
+        <text x={w - 24} y={pad - 8} className="fill-slate-400 text-[10px]">
           % rain
         </text>
       </svg>
